@@ -4,12 +4,14 @@ import (
 	"fmt"
 	"os"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 
 	"github.com/icampana/dsearch/internal/config"
 	"github.com/icampana/dsearch/internal/docset"
 	"github.com/icampana/dsearch/internal/render"
 	"github.com/icampana/dsearch/internal/search"
+	"github.com/icampana/dsearch/internal/tui"
 )
 
 var (
@@ -104,11 +106,17 @@ func runSearch(cmd *cobra.Command, args []string) error {
 }
 
 func runInteractive() error {
-	// TODO: Implement TUI
-	fmt.Println("Interactive TUI mode - coming soon!")
-	fmt.Println("For now, provide a search query: dsearch <query>")
-	fmt.Println("\nTo see available commands:")
-	fmt.Println("  dsearch --help")
+	// Launch TUI
+	p := tea.NewProgram(
+		tui.NewModel(searchEngine),
+		tea.WithAltScreen(),
+		tea.WithMouseCellMotion(),
+	)
+
+	if _, err := p.Run(); err != nil {
+		return fmt.Errorf("TUI error: %w", err)
+	}
+
 	return nil
 }
 
