@@ -7,27 +7,28 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/icampana/dsearch/internal/config"
-	"github.com/icampana/dsearch/internal/docset"
+	"github.com/icampana/dsearch/internal/devdocs"
 	"github.com/icampana/dsearch/internal/render"
 	"github.com/icampana/dsearch/internal/search"
 )
 
 var (
 	// Global flags
-	cfgFile   string
-	docsets   []string
-	format    string
-	limit     int
-	entryType string
-	listOnly  bool
-	full      bool
+	cfgFile  string
+	docs     []string
+	format   string
+	limit    int
+	listOnly bool
+	full     bool
 
 	// Paths for XDG directories
 	paths config.Paths
 
 	// Search engine instance
-	searchEngine *search.Engine
-	allDocsets   []docset.Docset
+	searchEngine  *search.Engine
+	allIndices    []*devdocs.Index
+	indicesBySlug map[string]*devdocs.Index
+	store         *devdocs.Store
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -36,28 +37,45 @@ var rootCmd = &cobra.Command{
 	Short: "Search API documentation offline",
 	Long: `dsearch is a fast, offline documentation search tool.
 
-It searches through Dash-compatible docsets and displays results
+It searches through DevDocs documentation and displays results
 in your terminal. Supports fuzzy matching and multiple output formats.
 
 Examples:
-  dsearch useState                # Search for "useState" in all docsets
-  dsearch useState -d react       # Search only in React docset
-  dsearch useState --format md    # Output as markdown
-  dsearch useState --full          # Show full content without truncation
-  dsearch --list                  # List all search results`,
+  dsearch useState              # Search for "useState" in all installed docs
+  dsearch useState -d react    # Search only in React documentation
+  dsearch useState --format md # Output as markdown
+  dsearch useState --full       # Show full content without truncation
+  dsearch --list               # List all search results`,
 	RunE: runSearch,
 	Args: cobra.MaximumNArgs(1), // Accept at most one query argument
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		// Initialize search engine before running commands
-		if cmd.Name() == "list" || cmd.Name() == "version" {
+		if cmd.Name() == "list" || cmd.Name() == "version" || cmd.Name() == "available" || cmd.Name() == "install" {
 			return nil // Skip engine initialization for these commands
 		}
-		var err error
-		allDocsets, err = docset.Discover(paths.DataDir)
-		if err != nil {
-			return fmt.Errorf("discovering docsets: %w", err)
+
+		// Load all installed indices
+		store = devdocs.NewStore(paths.DataDir)
+		installedSlugs := store.ListInstalled()
+
+		allIndices = make([]*devdocs.Index, 0, len(installedSlugs))
+		indicesBySlug = make(map[string]*devdocs.Index, len(installedSlugs))
+
+		for _, slug := range installedSlugs {
+			index, err := store.LoadIndex(slug)
+			if err != nil {
+				// Skip docs that can't be loaded
+				continue
+			}
+			allIndices = append(allIndices, index)
+			indicesBySlug[slug] = index
 		}
-		searchEngine = search.New(allDocsets, entryType, limit)
+
+		if len(allIndices) == 0 {
+			return fmt.Errorf("no documentation installed. Run 'dsearch install <doc>' to install documentation")
+		}
+
+		searchEngine = search.New(allIndices, indicesBySlug, limit)
 		return nil
 	},
 }
@@ -72,10 +90,9 @@ func init() {
 
 	// Persistent flags (available to all commands)
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default: $XDG_CONFIG_HOME/dsearch/config.yaml)")
-	rootCmd.PersistentFlags().StringSliceVarP(&docsets, "docset", "d", nil, "filter to specific docset(s)")
+	rootCmd.PersistentFlags().StringSliceVarP(&docs, "doc", "d", nil, "filter to specific doc(s)")
 	rootCmd.PersistentFlags().StringVarP(&format, "format", "f", "text", "output format: text, md")
 	rootCmd.PersistentFlags().IntVarP(&limit, "limit", "l", 10, "maximum number of results")
-	rootCmd.PersistentFlags().StringVarP(&entryType, "type", "t", "", "filter by entry type (Function, Class, Method, etc.)")
 	rootCmd.PersistentFlags().BoolVar(&listOnly, "list", false, "list results only, don't show content")
 	rootCmd.PersistentFlags().BoolVar(&full, "full", false, "show full content without truncation")
 
@@ -84,6 +101,7 @@ func init() {
 	rootCmd.AddCommand(availableCmd)
 	rootCmd.AddCommand(installCmd)
 	rootCmd.AddCommand(versionCmd)
+	rootCmd.AddCommand(createCmd)
 }
 
 func initConfig() {
@@ -106,9 +124,14 @@ func runSearch(cmd *cobra.Command, args []string) error {
 
 func runDirectSearch(query string) error {
 	// Perform search
-	results, err := searchEngine.Search(query, docsets)
+	results, warning, err := searchEngine.Search(query, docs)
 	if err != nil {
 		return err
+	}
+
+	// Display warning if any
+	if warning != "" {
+		fmt.Printf("⚠️  %s\n\n", warning)
 	}
 
 	// Display results
@@ -117,7 +140,7 @@ func runDirectSearch(query string) error {
 		return nil
 	}
 
-	// For now, just show the first result
+	// For now, just show first result
 	if len(results) == 0 {
 		fmt.Println("No results found.")
 		return nil
@@ -126,7 +149,7 @@ func runDirectSearch(query string) error {
 	// Display best match
 	result := results[0]
 	fmt.Printf("\n%s [%s]\n", result.Name, result.Type)
-	fmt.Printf("  Docset: %s\n", result.Docset)
+	fmt.Printf("  Doc: %s\n", result.Slug)
 	fmt.Printf("  Score: %.2f\n", result.Score)
 	fmt.Printf("  Path: %s\n", result.Path)
 	fmt.Println("\n--- Content ---")
@@ -171,7 +194,7 @@ func printResultList(results []search.Result) {
 	// Calculate max widths for alignment
 	maxName := 0
 	maxType := 0
-	maxDocset := 0
+	maxDoc := 0
 	for _, r := range results {
 		if len(r.Name) > maxName {
 			maxName = len(r.Name)
@@ -179,8 +202,8 @@ func printResultList(results []search.Result) {
 		if len(r.Type) > maxType {
 			maxType = len(r.Type)
 		}
-		if len(r.Docset) > maxDocset {
-			maxDocset = len(r.Docset)
+		if len(r.Slug) > maxDoc {
+			maxDoc = len(r.Slug)
 		}
 	}
 
@@ -190,13 +213,18 @@ func printResultList(results []search.Result) {
 			i+1,
 			maxName, r.Name,
 			maxType, r.Type,
-			maxDocset, r.Docset,
+			maxDoc, r.Slug,
 			r.Score,
 		)
 	}
 }
 
-// getDocsetContent reads the HTML content for a search result.
+// getDocsetContent reads HTML content for a search result from devdocs store.
 func getDocsetContent(result search.Result) ([]byte, error) {
-	return os.ReadFile(result.FullPath)
+	// Load from store using slug and path
+	content, err := store.LoadContent(result.Slug, result.Path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load content: %w", err)
+	}
+	return []byte(content), nil
 }

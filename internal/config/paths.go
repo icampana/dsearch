@@ -8,8 +8,8 @@ import (
 
 // Paths holds the XDG-compliant directory paths for dsearch.
 type Paths struct {
-	DataDir   string // Where docsets are stored
-	CacheDir  string // For downloads and temporary files
+	DataDir   string // Where DevDocs docs are stored (docs/{slug}/)
+	CacheDir  string // For downloads and temporary files (cache/manifest.json)
 	ConfigDir string // For configuration files
 }
 
@@ -37,7 +37,7 @@ func DefaultPaths() Paths {
 	}
 
 	return Paths{
-		DataDir:   filepath.Join(dataDir, "dsearch", "docsets"),
+		DataDir:   filepath.Join(dataDir, "dsearch", "docs"),
 		CacheDir:  filepath.Join(cacheDir, "dsearch"),
 		ConfigDir: filepath.Join(configDir, "dsearch"),
 	}
@@ -51,9 +51,4 @@ func (p Paths) EnsureDirs() error {
 		}
 	}
 	return nil
-}
-
-// DocsetDir returns the path where a specific docset would be stored.
-func (p Paths) DocsetDir(name string) string {
-	return filepath.Join(p.DataDir, name+".docset")
 }

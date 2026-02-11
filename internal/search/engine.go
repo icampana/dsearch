@@ -1,87 +1,103 @@
-// Package search provides search functionality across docsets.
+// Package search provides search functionality across DevDocs documentation.
 package search
 
 import (
 	"fmt"
 	"sort"
-	"strings"
 
 	"github.com/sahilm/fuzzy"
 
-	"github.com/icampana/dsearch/internal/docset"
+	"github.com/icampana/dsearch/internal/devdocs"
 )
 
-// Engine handles searching across multiple docsets.
+// Engine handles searching across multiple DevDocs indices.
 type Engine struct {
-	docsets   []docset.Docset
-	entryType string
-	limit     int
+	indices       []*devdocs.Index
+	indicesBySlug map[string]*devdocs.Index // slug -> Index lookup
+	limit         int
 }
 
 // New creates a new search engine.
-func New(docsets []docset.Docset, entryType string, limit int) *Engine {
+func New(indices []*devdocs.Index, indicesBySlug map[string]*devdocs.Index, limit int) *Engine {
 	return &Engine{
-		docsets:   docsets,
-		entryType: entryType,
-		limit:     limit,
+		indices:       indices,
+		indicesBySlug: indicesBySlug,
+		limit:         limit,
 	}
 }
 
 // Result represents a search result with fuzzy match score.
 type Result struct {
-	docset.Entry
+	devdocs.Entry
+	Slug  string  // Which doc this result is from
 	Score float64 // Fuzzy match score (0-1)
 }
 
-// Search performs a search across all docsets with fuzzy matching.
-func (e *Engine) Search(query string, docsetNames []string) ([]Result, error) {
+// Search performs a search across all indices with fuzzy matching.
+// If docSlugs is specified, only those docs are searched.
+// Warns via returned warning string if searching across >10 docs without filtering.
+func (e *Engine) Search(query string, docSlugs []string) ([]Result, string, error) {
 	var results []Result
+	var warning string
 
-	// Filter docsets by name if specified
-	docsetsToSearch := e.docsets
-	if len(docsetNames) > 0 {
-		docsetsToSearch = make([]docset.Docset, 0)
-		nameSet := make(map[string]bool)
-		for _, name := range docsetNames {
-			nameSet[strings.ToLower(name)] = true
-		}
-		for _, ds := range e.docsets {
-			if nameSet[strings.ToLower(ds.Name)] {
-				docsetsToSearch = append(docsetsToSearch, ds)
+	// Filter indices by slug if specified
+	indicesToSearch := e.indices
+	if len(docSlugs) > 0 {
+		indicesToSearch = make([]*devdocs.Index, 0)
+		for _, slug := range docSlugs {
+			if idx, ok := e.indicesBySlug[slug]; ok {
+				indicesToSearch = append(indicesToSearch, idx)
 			}
 		}
 	}
 
-	if len(docsetsToSearch) == 0 {
-		return nil, fmt.Errorf("no matching docsets found")
+	if len(indicesToSearch) == 0 {
+		return nil, "", fmt.Errorf("no matching docs found")
 	}
 
-	// Collect all entries from all docsets
-	var allEntries []docset.Entry
-	for _, ds := range docsetsToSearch {
-		entries, err := ds.Search(query, e.entryType, e.limit)
-		if err != nil {
-			return nil, fmt.Errorf("searching %s: %w", ds.Name, err)
+	// Warn if searching across many docs without filtering
+	if len(indicesToSearch) > 10 && len(docSlugs) == 0 {
+		warning = fmt.Sprintf("Searching across %d docs. Use -d <doc> for faster results.", len(indicesToSearch))
+	}
+
+	// Collect all entries from all indices with their source slug
+	type indexedEntry struct {
+		entry devdocs.Entry
+		slug  string
+	}
+	var allEntries []indexedEntry
+	for _, idx := range indicesToSearch {
+		// Find which slug this index belongs to
+		slug := ""
+		for s, i := range e.indicesBySlug {
+			if i == idx {
+				slug = s
+				break
+			}
 		}
-		allEntries = append(allEntries, entries...)
+		for _, entry := range idx.Entries {
+			allEntries = append(allEntries, indexedEntry{entry: entry, slug: slug})
+		}
 	}
 
 	if len(allEntries) == 0 {
-		return nil, fmt.Errorf("no results found for %q", query)
+		return nil, "", fmt.Errorf("no results found for %q", query)
 	}
 
 	// Apply fuzzy matching to rank results
 	names := make([]string, len(allEntries))
-	for i, entry := range allEntries {
-		names[i] = entry.Name
+	for i, ie := range allEntries {
+		names[i] = ie.entry.Name
 	}
 
 	matches := fuzzy.Find(query, names)
 
 	// Build results with scores
 	for _, match := range matches {
+		ie := allEntries[match.Index]
 		results = append(results, Result{
-			Entry: allEntries[match.Index],
+			Entry: ie.entry,
+			Slug:  ie.slug,
 			Score: float64(match.Score) / 100.0, // Normalize to 0-1
 		})
 	}
@@ -91,7 +107,7 @@ func (e *Engine) Search(query string, docsetNames []string) ([]Result, error) {
 		if results[i].Score != results[j].Score {
 			return results[i].Score > results[j].Score
 		}
-		return results[i].Name < results[j].Name
+		return results[i].Entry.Name < results[j].Entry.Name
 	})
 
 	// Limit results
@@ -99,5 +115,5 @@ func (e *Engine) Search(query string, docsetNames []string) ([]Result, error) {
 		results = results[:e.limit]
 	}
 
-	return results, nil
+	return results, warning, nil
 }
