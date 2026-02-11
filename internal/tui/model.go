@@ -1,4 +1,4 @@
-// Package tui provides the interactive terminal user interface for dsearch.
+// Package tui provides an interactive terminal user interface for dsearch.
 package tui
 
 import (
@@ -8,9 +8,12 @@ import (
 
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/textinput"
+	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/icampana/dsearch/internal/docset"
+	"github.com/icampana/dsearch/internal/render"
 	"github.com/icampana/dsearch/internal/search"
 )
 
@@ -52,14 +55,21 @@ type searchFinishedMsg struct {
 	query   string
 }
 
+// contentLoadedMsg is sent when documentation content is loaded.
+type contentLoadedMsg struct {
+	content string
+}
+
 // Model represents the TUI application state.
 type Model struct {
 	// Dependencies
-	engine *search.Engine
+	engine  *search.Engine
+	docsets []docset.Docset
 
 	// UI Components
-	input textinput.Model
-	list  list.Model
+	input    textinput.Model
+	list     list.Model
+	viewport viewport.Model
 
 	// State
 	loading      bool
@@ -67,15 +77,20 @@ type Model struct {
 	searchedOnce bool
 	width        int
 	height       int
-	previewText  string
 	showPreview  bool
 
-	// Error state
-	err error
+	// Configuration
+	outputFormat render.Format
+
+	// Content
+	selectedResult *search.Result
+	selectedDocset *docset.Docset
+	previewText    string
+	err            error
 }
 
-// NewModel creates a new TUI model with the given search engine.
-func NewModel(engine *search.Engine) Model {
+// NewModel creates a new TUI model with the given search engine and docsets.
+func NewModel(engine *search.Engine, docsets []docset.Docset) Model {
 	// Initialize text input
 	ti := textinput.New()
 	ti.Placeholder = "Search..."
@@ -102,14 +117,20 @@ func NewModel(engine *search.Engine) Model {
 	l.SetShowPagination(false)
 	l.DisableQuitKeybindings()
 
+	// Initialize viewport
+	vp := viewport.New(0, 0)
+
 	return Model{
-		engine:      engine,
-		input:       ti,
-		list:        l,
-		loading:     false,
-		showPreview: true,
-		width:       80,
-		height:      24,
+		engine:       engine,
+		docsets:      docsets,
+		input:        ti,
+		list:         l,
+		viewport:     vp,
+		loading:      false,
+		showPreview:  true,
+		outputFormat: render.FormatText,
+		width:        80,
+		height:       24,
 	}
 }
 
@@ -132,12 +153,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Handle selection
 			if m.list.SelectedItem() != nil {
 				if item, ok := m.list.SelectedItem().(resultItem); ok {
-					m.previewText = fmt.Sprintf("Selected: %s\n\nType: %s\nDocset: %s\nPath: %s",
-						item.result.Name,
-						item.result.Type,
-						item.result.Docset,
-						item.result.Path,
-					)
+					m.selectedResult = &item.result
+					return m, m.loadContentCmd(item.result)
 				}
 			}
 			return m, nil
@@ -155,6 +172,40 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				cmds = append(cmds, cmd)
 			}
 			return m, tea.Batch(cmds...)
+
+		case tea.KeyPgUp, tea.KeyPgDown:
+			// Handle viewport scrolling in preview
+			if m.showPreview {
+				var cmd tea.Cmd
+				m.viewport, cmd = m.viewport.Update(msg)
+				cmds = append(cmds, cmd)
+				return m, tea.Batch(cmds...)
+			}
+			return m, nil
+
+		case tea.KeyHome, tea.KeyEnd:
+			// Handle viewport scrolling
+			if m.showPreview {
+				var cmd tea.Cmd
+				m.viewport, cmd = m.viewport.Update(msg)
+				cmds = append(cmds, cmd)
+				return m, tea.Batch(cmds...)
+			}
+			return m, nil
+
+		case tea.KeyCtrlU:
+			// Scroll to top
+			if m.showPreview {
+				m.viewport.GotoTop()
+				return m, nil
+			}
+
+		case tea.KeyCtrlD:
+			// Scroll to bottom
+			if m.showPreview {
+				m.viewport.GotoBottom()
+				return m, nil
+			}
 		}
 
 	case tea.WindowSizeMsg:
@@ -172,10 +223,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Update list size
 		listHeight := msg.Height - 6
 		if m.showPreview {
-			listHeight = msg.Height/2 - 4
+			listHeight = msg.Height/2 - 2
 		}
 
 		m.list.SetSize(msg.Width-4, listHeight)
+
+		// Update viewport size
+		previewHeight := msg.Height/2 - 2
+		m.viewport.Width = msg.Width - 6
+		m.viewport.Height = previewHeight
 
 	case searchFinishedMsg:
 		// Handle search completion
@@ -195,10 +251,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// If we have results, select the first one
 		if len(items) > 0 {
 			m.list.Select(0)
-			m.previewText = m.buildPreviewText(items[0].(resultItem))
+			item := items[0].(resultItem)
+			m.selectedResult = &item.result
+			cmds = append(cmds, m.loadContentCmd(item.result))
 		} else {
+			m.selectedResult = nil
 			m.previewText = ""
 		}
+
+	case contentLoadedMsg:
+		// Handle content load completion
+		m.previewText = msg.content
 
 	case error:
 		// Handle errors
@@ -221,6 +284,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else if len(inputText) == 0 {
 			// Clear results on empty input
 			m.list.SetItems([]list.Item{})
+			m.selectedResult = nil
 			m.previewText = ""
 		}
 	}
@@ -228,6 +292,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Update list
 	m.list, cmd = m.list.Update(msg)
 	cmds = append(cmds, cmd)
+
+	// Update viewport
+	if m.showPreview && m.previewText != "" {
+		m.viewport.SetContent(m.previewText)
+		// Only call viewport.Update for non-Window messages
+		// WindowSizeMsg is handled separately above
+		var vpCmd tea.Cmd
+		if _, isWindowMsg := msg.(tea.WindowSizeMsg); !isWindowMsg {
+			m.viewport, vpCmd = m.viewport.Update(msg)
+			cmds = append(cmds, vpCmd)
+		}
+	}
 
 	return m, tea.Batch(cmds...)
 }
@@ -257,20 +333,31 @@ func (m Model) View() string {
 		b.WriteString(statusStyle.Render("No results found\n\n"))
 	}
 
-	// Results list
+	// Results and Preview sections
 	if len(m.list.Items()) > 0 {
-		b.WriteString(m.list.View())
+		if m.showPreview {
+			// Split view: list on top, preview on bottom
+			b.WriteString(m.list.View())
+
+			// Preview panel
+			b.WriteString(previewStyle.Render(m.viewport.View()))
+		} else {
+			// Full screen list
+			b.WriteString(m.list.View())
+		}
 		b.WriteString("\n")
 
-		// Preview
-		if m.showPreview && m.previewText != "" {
-			b.WriteString(previewStyle.Render(m.previewText))
+		// Help text
+		if !m.showPreview {
+			b.WriteString(statusStyle.Render("Tab: Show Preview | Ctrl+C: Quit"))
+		} else {
+			b.WriteString(statusStyle.Render("Tab: Hide Preview | ↑↓: Scroll | Ctrl+U/D: Top/Bottom | Ctrl+C: Quit"))
 		}
 	} else if !m.searchedOnce {
 		b.WriteString(statusStyle.Render("Type to search (min 2 characters)\n\n"))
-		b.WriteString(statusStyle.Render("Ctrl+C: Quit | Tab: Toggle Preview | Enter: Select\n"))
-	} else {
 		b.WriteString(statusStyle.Render("Ctrl+C: Quit | Tab: Toggle Preview"))
+	} else {
+		b.WriteString(statusStyle.Render("Ctrl+C: Quit"))
 	}
 
 	return docStyle.Render(b.String())
@@ -294,15 +381,42 @@ func (m Model) performSearchCmd(query string) tea.Cmd {
 	}
 }
 
-// buildPreviewText builds the preview text for a result.
-func (m Model) buildPreviewText(item resultItem) string {
-	var b strings.Builder
+// loadContentCmd loads and renders the documentation content for a result.
+func (m Model) loadContentCmd(result search.Result) tea.Cmd {
+	return func() tea.Msg {
+		// Find the docset for this result
+		var ds *docset.Docset
+		for i := range m.docsets {
+			if m.docsets[i].Name == result.Docset {
+				ds = &m.docsets[i]
+				break
+			}
+		}
 
-	b.WriteString(fmt.Sprintf("Name: %s\n", item.result.Name))
-	b.WriteString(fmt.Sprintf("Type: %s\n", item.result.Type))
-	b.WriteString(fmt.Sprintf("Docset: %s\n", item.result.Docset))
-	b.WriteString(fmt.Sprintf("Score: %.2f\n", item.result.Score))
-	b.WriteString(fmt.Sprintf("Path: %s\n", item.result.Path))
+		if ds == nil {
+			return fmt.Errorf("docset not found: %s", result.Docset)
+		}
 
-	return b.String()
+		// Get HTML content from the docset (result embeds Entry)
+		content, err := ds.GetContent(result.Entry)
+		if err != nil {
+			return fmt.Errorf("reading content: %w", err)
+		}
+
+		// Render the content using the configured format
+		renderer := render.New(m.outputFormat)
+		rendered, err := renderer.Render(content)
+		if err != nil {
+			return fmt.Errorf("rendering content: %w", err)
+		}
+
+		return contentLoadedMsg{
+			content: rendered,
+		}
+	}
+}
+
+// SetOutputFormat sets the output format for the preview.
+func (m *Model) SetOutputFormat(format render.Format) {
+	m.outputFormat = format
 }

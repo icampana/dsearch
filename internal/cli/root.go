@@ -29,6 +29,7 @@ var (
 
 	// Search engine instance
 	searchEngine *search.Engine
+	allDocsets   []docset.Docset
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -54,7 +55,8 @@ Examples:
 		if cmd.Name() == "list" || cmd.Name() == "version" {
 			return nil // Skip engine initialization for these commands
 		}
-		allDocsets, err := docset.Discover(paths.DataDir)
+		var err error
+		allDocsets, err = docset.Discover(paths.DataDir)
 		if err != nil {
 			return fmt.Errorf("discovering docsets: %w", err)
 		}
@@ -107,8 +109,11 @@ func runSearch(cmd *cobra.Command, args []string) error {
 
 func runInteractive() error {
 	// Launch TUI
+	model := tui.NewModel(searchEngine, allDocsets)
+	model.SetOutputFormat(render.Format(format))
+
 	p := tea.NewProgram(
-		tui.NewModel(searchEngine),
+		model,
 		tea.WithAltScreen(),
 		tea.WithMouseCellMotion(),
 	)
