@@ -451,5 +451,9 @@ func (ds *Docset) searchFiles(pattern string, limit int) ([]Entry, error) {
 
 // GetContent reads the HTML content for an entry.
 func (ds *Docset) GetContent(entry Entry) ([]byte, error) {
+	// Check if file exists first
+	if _, err := os.Stat(entry.FullPath); os.IsNotExist(err) {
+		return nil, fmt.Errorf("documentation file not found: %s", entry.FullPath)
+	}
 	return os.ReadFile(entry.FullPath)
 }

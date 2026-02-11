@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
@@ -18,14 +19,15 @@ import (
 )
 
 var (
-	docStyle          = lipgloss.NewStyle().Padding(1, 2)
-	titleStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("13")).Bold(true)
-	inputStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("212"))
-	placeholderStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
-	statusStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("242")).Italic(true)
-	selectedItemStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("205")).Bold(true)
-	normalItemStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("250"))
-	previewStyle      = lipgloss.NewStyle().Padding(1).Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("238"))
+	// Use explicit background colors to prevent black-on-black rendering
+	docStyle          = lipgloss.NewStyle().Padding(1, 2).Background(lipgloss.Color("0"))
+	titleStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("13")).Bold(true).Background(lipgloss.Color("0"))
+	inputStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("212")).Background(lipgloss.Color("0"))
+	placeholderStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Background(lipgloss.Color("0"))
+	statusStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("242")).Italic(true).Background(lipgloss.Color("0"))
+	selectedItemStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("205")).Bold(true).Background(lipgloss.Color("0"))
+	normalItemStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("250")).Background(lipgloss.Color("0"))
+	previewStyle      = lipgloss.NewStyle().Padding(1).Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("238")).Background(lipgloss.Color("0"))
 )
 
 // resultItem implements list.Item for search results.
@@ -87,6 +89,10 @@ func NewModel(engine *search.Engine, docsets []docset.Docset) Model {
 	ti.CharLimit = 100
 	ti.Width = 50
 
+	// Disable Ctrl+C in textinput so it can be used for quitting
+	ti.KeyMap.AcceptSuggestion = key.NewBinding(key.WithDisabled())
+	// Keep other default keybindings but ensure Ctrl+C passes through
+
 	delegate := list.NewDefaultDelegate()
 	delegate.SetSpacing(0)
 	delegate.Styles.SelectedTitle = selectedItemStyle
@@ -125,15 +131,33 @@ func (m Model) Init() tea.Cmd {
 
 // Update handles incoming messages and updates the model.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// Handle quit keys at the very top level, before any other processing
+	if keyMsg, ok := msg.(tea.KeyMsg); ok {
+		// Check for quit keys by both Type and String representation
+		if keyMsg.Type == tea.KeyCtrlC || keyMsg.Type == tea.KeyEsc {
+			return m, tea.Quit
+		}
+		keyStr := keyMsg.String()
+		if keyStr == "ctrl+c" || keyStr == "esc" {
+			return m, tea.Quit
+		}
+		// 'q' to quit when input is not focused or empty
+		if keyStr == "q" && (!m.input.Focused() || m.input.Value() == "") {
+			return m, tea.Quit
+		}
+	}
+
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		switch msg.Type {
-		case tea.KeyCtrlC:
-			m.quit = true
-			return m, tea.Quit
+		// If there's an error, allow Enter to dismiss it
+		if m.err != nil && msg.Type == tea.KeyEnter {
+			m.err = nil
+			return m, nil
+		}
 
+		switch msg.Type {
 		case tea.KeyEnter:
 			if m.list.SelectedItem() != nil {
 				if item, ok := m.list.SelectedItem().(resultItem); ok {
@@ -144,6 +168,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case tea.KeyTab:
 			m.showPreview = !m.showPreview
+			m.updateDimensions()
 			return m, nil
 
 		case tea.KeyUp, tea.KeyDown:
@@ -175,25 +200,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-
-		inputWidth := msg.Width / 2
-		if inputWidth > 100 {
-			inputWidth = 100
-		}
-		m.input.Width = inputWidth
-
-		listWidth := msg.Width / 2
-		listHeight := msg.Height - 4
-		if m.showPreview {
-			listHeight = listHeight - 1
-		}
-
-		m.list.SetSize(listWidth, listHeight)
-
-		if m.showPreview {
-			m.viewport.Width = listWidth
-			m.viewport.Height = listHeight
-		}
+		m.updateDimensions()
 
 	case searchFinishedMsg:
 		m.loading = false
@@ -220,6 +227,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case error:
 		m.err = msg
 		m.loading = false
+		// When error occurs, stop processing other updates but still return
+		return m, nil
+	}
+
+	// If there's an error, only process quit keys (handled above), skip everything else
+	if m.err != nil {
+		return m, nil
 	}
 
 	// Update input
@@ -244,52 +258,103 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.viewport.SetContent(m.previewText)
 	}
 
+	// Ensure dimensions are updated
+	m.updateDimensions()
+
 	return m, tea.Batch(cmds...)
+}
+
+// updateDimensions updates the dimensions of child components based on current window size.
+func (m *Model) updateDimensions() {
+	listWidth := m.width / 2
+	listHeight := m.height - 6 // Account for title, search, status bars, and padding
+	if listHeight < 5 {
+		listHeight = 5
+	}
+
+	// Update input width
+	inputWidth := m.width / 2
+	if inputWidth > 100 {
+		inputWidth = 100
+	}
+	m.input.Width = inputWidth
+
+	// Update list dimensions
+	m.list.SetSize(listWidth-2, listHeight)
+
+	// Update viewport dimensions
+	if m.showPreview {
+		m.viewport.Width = listWidth - 4
+		m.viewport.Height = listHeight - 2
+	}
 }
 
 // View renders the TUI.
 func (m Model) View() string {
 	if m.err != nil {
 		return docStyle.Render(
-			fmt.Sprintf("Error: %v\n\nPress Ctrl+C to quit", m.err),
+			fmt.Sprintf("Error: %v\n\nPress Enter to dismiss or Ctrl+C to quit", m.err),
 		)
 	}
 
-	var b strings.Builder
+	// Calculate dimensions (pure computation, no state mutation)
+	listWidth := m.width / 2
+	listHeight := m.height - 6 // Account for title, search, status bars, and padding
+	if listHeight < 5 {
+		listHeight = 5
+	}
 
-	b.WriteString(titleStyle.Render("dsearch - Offline Documentation Search\n\n"))
-
-	b.WriteString("Search: ")
-	b.WriteString(m.input.View())
-	b.WriteString("\n")
+	// Build the header
+	var header strings.Builder
+	header.WriteString(titleStyle.Render("dsearch - Offline Documentation Search"))
+	header.WriteString("\n\n")
+	header.WriteString("Search: ")
+	header.WriteString(m.input.View())
+	header.WriteString("\n")
 
 	if m.loading {
-		b.WriteString(statusStyle.Render("Searching...\n"))
+		header.WriteString(statusStyle.Render("Searching..."))
+		header.WriteString("\n")
 	}
 
-	listWidth := m.width / 2
-	listHeight := m.height - 3
+	// Render left pane (results list) - dimensions already set in updateDimensions()
+	leftStyle := lipgloss.NewStyle().
+		Width(listWidth).
+		Height(listHeight).
+		Background(lipgloss.Color("0"))
+	leftPane := leftStyle.Render(m.list.View())
 
-	leftStyle := lipgloss.NewStyle().Width(listWidth)
-
-	b.WriteString(leftStyle.Render(m.list.View()))
-
-	if m.showPreview && m.previewText != "" {
-		rightStyle := lipgloss.NewStyle().Width(listWidth)
-		b.WriteString(rightStyle.Render(previewStyle.Render(m.viewport.View())))
-	} else {
-		rightStyle := lipgloss.NewStyle().Width(listWidth)
-		b.WriteString(rightStyle.Render(lipgloss.NewStyle().Height(listHeight).Render("")))
-	}
-
-	b.WriteString("\n")
-
-	helpText := "Tab: Toggle Preview | Ctrl+C: Quit"
+	// Render right pane (preview or empty) - dimensions already set in updateDimensions()
+	var rightPane string
 	if m.showPreview {
-		helpText = "Tab: Hide | ↑↓: Navigate | PgUp/PgDn: Scroll | Ctrl+C: Quit"
+		previewContent := previewStyle.Render(m.viewport.View())
+		rightStyle := lipgloss.NewStyle().
+			Width(listWidth).
+			Height(listHeight).
+			Background(lipgloss.Color("0"))
+		rightPane = rightStyle.Render(previewContent)
 	} else {
-		helpText = "Tab: Show Preview | ↑↓: Navigate | Ctrl+C: Quit"
+		rightStyle := lipgloss.NewStyle().
+			Width(listWidth).
+			Height(listHeight).
+			Background(lipgloss.Color("0"))
+		rightPane = rightStyle.Render("")
 	}
+
+	// Join panes horizontally
+	content := lipgloss.JoinHorizontal(lipgloss.Top, leftPane, rightPane)
+
+	// Build help text
+	helpText := "Tab: Toggle Preview | ↑↓: Navigate | Ctrl+C/Esc/q: Quit"
+	if m.showPreview {
+		helpText = "Tab: Hide Preview | ↑↓: Navigate | PgUp/PgDn: Scroll | Ctrl+C/Esc: Quit"
+	}
+
+	// Combine all sections
+	var b strings.Builder
+	b.WriteString(header.String())
+	b.WriteString(content)
+	b.WriteString("\n")
 	b.WriteString(statusStyle.Render(helpText))
 
 	return docStyle.Render(b.String())

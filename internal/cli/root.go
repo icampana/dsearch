@@ -4,14 +4,12 @@ import (
 	"fmt"
 	"os"
 
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 
 	"github.com/icampana/dsearch/internal/config"
 	"github.com/icampana/dsearch/internal/docset"
 	"github.com/icampana/dsearch/internal/render"
 	"github.com/icampana/dsearch/internal/search"
-	"github.com/icampana/dsearch/internal/tui"
 )
 
 var (
@@ -39,15 +37,14 @@ var rootCmd = &cobra.Command{
 	Long: `dsearch is a fast, offline documentation search tool.
 
 It searches through Dash-compatible docsets and displays results
-in your terminal. Supports fuzzy matching, multiple output formats,
-and an interactive TUI mode.
+in your terminal. Supports fuzzy matching and multiple output formats.
 
 Examples:
   dsearch useState                # Search for "useState" in all docsets
   dsearch useState -d react       # Search only in React docset
   dsearch useState --format md    # Output as markdown
   dsearch useState --full          # Show full content without truncation
-  dsearch                             # Launch interactive TUI`,
+  dsearch --list                  # List all search results`,
 	RunE: runSearch,
 	Args: cobra.MaximumNArgs(1), // Accept at most one query argument
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
@@ -98,31 +95,13 @@ func initConfig() {
 
 func runSearch(cmd *cobra.Command, args []string) error {
 	if len(args) == 0 {
-		// No query provided - launch interactive TUI
-		return runInteractive()
+		// No query provided - show help
+		return cmd.Help()
 	}
 
 	// Direct search mode
 	query := args[0]
 	return runDirectSearch(query)
-}
-
-func runInteractive() error {
-	// Launch TUI
-	model := tui.NewModel(searchEngine, allDocsets)
-	model.SetOutputFormat(render.Format(format))
-
-	p := tea.NewProgram(
-		model,
-		tea.WithAltScreen(),
-		tea.WithMouseCellMotion(),
-	)
-
-	if _, err := p.Run(); err != nil {
-		return fmt.Errorf("TUI error: %w", err)
-	}
-
-	return nil
 }
 
 func runDirectSearch(query string) error {
