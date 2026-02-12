@@ -31,7 +31,7 @@ func runAvailable(cmd *cobra.Command, args []string) error {
 
 	// If not cached or stale, fetch from DevDocs
 	if err != nil {
-		client := devdocs.NewClient("https://documents.devdocs.io")
+		client := devdocs.NewClient("")
 		manifest, err = client.FetchManifest()
 		if err != nil {
 			return fmt.Errorf("fetching available docs: %w", err)
@@ -53,6 +53,8 @@ func runAvailable(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Printf("Available documentation (%d total):\n\n", len(manifest))
+	fmt.Printf("  %-30s %-25s %-12s %s %s\n", "NAME", "SLUG", "VERSION", "SIZE", "ALIAS")
+	fmt.Println(strings.Repeat("-", 85))
 
 	// Group by first letter for easier navigation
 	currentLetter := rune(' ')
@@ -85,7 +87,8 @@ func runAvailable(cmd *cobra.Command, args []string) error {
 			aliasStr = fmt.Sprintf("[%s]", doc.Alias)
 		}
 
-		fmt.Printf("  %-30s %-15s %s %s\n", doc.Name, versionInfo, formatBytes(doc.DBSize), aliasStr)
+		// Show both name and slug for clarity (slug is what install command needs)
+		fmt.Printf("  %-30s %-25s %-10s %s %s\n", doc.Name, doc.Slug, versionInfo, formatBytes(doc.DBSize), aliasStr)
 		count++
 
 		// Show limited results if there's a query
@@ -97,8 +100,9 @@ func runAvailable(cmd *cobra.Command, args []string) error {
 
 	if query == "" {
 		fmt.Printf("\nTo install documentation, run:\n")
-		fmt.Println("  dsearch install <doc-name>              # Install latest version")
-		fmt.Println("  dsearch install <doc-name>@<version>     # Install specific version (e.g., react@18)")
+		fmt.Println("  dsearch install <slug>               # Use the SLUG shown above")
+		fmt.Println("  dsearch install <slug>@<version>      # Or: <doc-name>@<version> (e.g., react@18, python@3.14)")
+		fmt.Println("\n  Note: For some docs (like Python), you must specify a version.")
 	}
 	return nil
 }
