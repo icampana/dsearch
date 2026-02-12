@@ -26,9 +26,25 @@ go install github.com/icampana/dsearch/cmd/dsearch@latest
 
 Ensure your `$GOPATH/bin` is in your `$PATH`.
 
+### Using eget
+
+You can either use [eget](https://github.com/zyedidia/eget)
+
+Easiest way to install without go (Linux/macOS):
+
+```bash
+eget icampana/dsearch --to=~/.local/bin
+```
+
+Or install it using go install:
+
+```bash
+go install github.com/icampana/dsearch/cmd/dsearch@latest
+```
+
 ### Pre-built Binaries
 
-> Coming soon! Automated releases for Linux, macOS, and Windows will be available on the [Releases](https://github.com/icampana/dsearch/releases) page.
+Pre-built binaries for Linux, macOS, and Windows are available on the [Releases](https://github.com/icampana/dsearch/releases) page.
 
 ## Usage
 
@@ -77,6 +93,18 @@ dsearch --json useState
 - **Data (Docs)**: `$XDG_DATA_HOME/dsearch` (default: `~/.local/share/dsearch`)
 - **Cache**: `$XDG_CACHE_HOME/dsearch` (default: `~/.cache/dsearch`)
 - **Config**: `$XDG_CONFIG_HOME/dsearch` (default: `~/.config/dsearch`)
+
+## AI Agent Skill
+
+This project includes a specialized skill for AI agents (like those using `vercel-labs/skills`). This allows agents to autonomously search and read documentation.
+
+To install the skill:
+
+```bash
+npx skills add https://github.com/icampana/dsearch
+```
+
+This will expose the `dsearch` tool to your agent, allowing it to verify syntax, check signatures, and read docs without internet access.
 
 ## License
 
