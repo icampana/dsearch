@@ -270,7 +270,45 @@ func TestLoad(t *testing.T) {
 go test -race ./internal/tui
 ```
 
-## Bubble Tea Specific Conventions
+## CLI-Specific Conventions
+
+### Command Structure
+- Use `spf13/cobra` for command hierarchy
+- Keep command handlers in `internal/cli`
+- Each command in its own file (e.g., `install.go`, `search.go`)
+
+### Error Aggregation in Loop Commands
+```go
+// GOOD - track and report partial failures
+var errors []string
+successCount := 0
+
+for _, item := range items {
+    if err := process(item); err != nil {
+        errors = append(errors, fmt.Sprintf("failed to process %s: %v", item, err))
+        continue
+    }
+    successCount++
+}
+
+if len(errors) > 0 {
+    fmt.Fprintf(os.Stderr, "\n%d operation(s) failed:\n", len(errors))
+    for _, errMsg := range errors {
+        fmt.Fprintf(os.Stderr, "  - %s\n", errMsg)
+    }
+    if successCount == 0 {
+        return fmt.Errorf("all operations failed")
+    }
+    return fmt.Errorf("%d operation(s) failed (see above)", len(errors))
+}
+```
+
+### Output Conventions
+- `stdout`: Search results, content, JSON output
+- `stderr`: Errors, warnings, progress messages (use `fmt.Fprintf(os.Stderr, ...)`)
+- Never use `log.Printf` for CLI output - use `fmt.Fprintf` for consistency
+
+
 
 ### Model Implementation
 ```go
