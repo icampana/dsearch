@@ -36,12 +36,6 @@ Easiest way to install without go (Linux/macOS):
 eget icampana/dsearch --to=~/.local/bin
 ```
 
-Or install it using go install:
-
-```bash
-go install github.com/icampana/dsearch/cmd/dsearch@latest
-```
-
 ### Pre-built Binaries
 
 Pre-built binaries for Linux, macOS, and Windows are available on the [Releases](https://github.com/icampana/dsearch/releases) page.
