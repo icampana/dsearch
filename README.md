@@ -2,7 +2,7 @@
 
 **dsearch** is a fast, offline documentation search tool for your terminal. It brings the power of [DevDocs.io](https://devdocs.io) to your command line, allowing you to search and read documentation without leaving your terminal.
 
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![License](https://img.shields.io/badge/license-MPL_2.0-blue.svg)
 ![Go Version](https://img.shields.io/badge/go-1.25.7-blue.svg)
 
 ## Features
@@ -102,7 +102,7 @@ This will expose the `dsearch` tool to your agent, allowing it to verify syntax,
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the Mozilla Public License 2.0 - see the [LICENSE](LICENSE) file for details.
 
 ---
 
