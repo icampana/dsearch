@@ -11,7 +11,6 @@ import (
 
 const (
 	defaultTimeout     = 60 * time.Second
-	userAgent          = "github.com/icampana/dsearch"
 	defaultManifestURL = "https://devdocs.io"
 	defaultContentURL  = "https://documents.devdocs.io"
 )
