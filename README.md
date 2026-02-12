@@ -16,6 +16,31 @@
 
 ## Installation
 
+### Using eget (Recommended)
+
+The easiest way to install `dsearch` without Go is using [eget](https://github.com/zyedidia/eget):
+
+```bash
+eget icampana/dsearch --to=~/.local/bin
+```
+
+**Don't have eget?** Install it first:
+
+```bash
+# macOS
+brew install eget
+
+# Linux
+curl https://zyedidia.github.io/eget.sh | sh
+mv eget ~/.local/bin/
+```
+
+Make sure `~/.local/bin` is in your `$PATH`:
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+```
+
 ### From Source
 
 If you have Go installed (1.23+), you can install `dsearch` directly:
@@ -25,16 +50,6 @@ go install github.com/icampana/dsearch/cmd/dsearch@latest
 ```
 
 Ensure your `$GOPATH/bin` is in your `$PATH`.
-
-### Using eget
-
-You can either use [eget](https://github.com/zyedidia/eget)
-
-Easiest way to install without go (Linux/macOS):
-
-```bash
-eget icampana/dsearch --to=~/.local/bin
-```
 
 ### Pre-built Binaries
 
