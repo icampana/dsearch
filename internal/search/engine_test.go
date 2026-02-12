@@ -7,6 +7,8 @@ import (
 )
 
 func TestEngine_Search(t *testing.T) {
+	t.Parallel()
+
 	// Setup test data
 	index1 := &devdocs.Index{
 		Entries: []devdocs.Entry{
@@ -80,6 +82,7 @@ func TestEngine_Search(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			results, warning, err := engine.Search(tt.query, tt.slugs)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Engine.Search() error = %v, wantErr %v", err, tt.wantErr)
@@ -102,6 +105,8 @@ func TestEngine_Search(t *testing.T) {
 }
 
 func TestEngine_Limit(t *testing.T) {
+	t.Parallel()
+
 	// Create larger index
 	entries := make([]devdocs.Entry, 20)
 	for i := 0; i < 20; i++ {
