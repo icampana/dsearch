@@ -1,6 +1,6 @@
 # Binaries
 bin/
-dsearch
+/dsearch
 
 # Go build cache
 *.exe
