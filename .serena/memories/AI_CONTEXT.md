@@ -1,123 +1,69 @@
-# DSearch Project Context
+# AI CONTEXT & ARCHITECTURAL MAP
+> Last Updated: 2026-02-12
 
-## Project Overview
+## 1. Tech Stack & Versions
+- **Language:** Go 1.25.7
+- **CLI Framework:** `spf13/cobra` (v1.10.2)
+- **Search Engine:** In-memory fuzzy search using `sahilm/fuzzy`
+- **Documentation Source:** DevDocs API (devdocs.io)
+- **Rendering:**
+  - HTML parsing: `codeberg.org/readeck/go-readability`
+  - Markdown conversion: `github.com/JohannesKaufmann/html-to-markdown/v2`
+  - Terminal UX: `github.com/schollz/progressbar/v3`
+- **Storage:** XDG-compliant filesystem storage (JSON indices, HTML content)
 
-**DSearch** is a fast, offline documentation search tool built in Go. It searches through Dash-compatible docsets and displays results in your terminal or via an interactive TUI.
+## 2. High-Level Architecture
+`dsearch` is a CLI-based offline documentation browser inspired by Zeal/Dash but tailored for the terminal. It follows a "fetch-index-search" architecture:
+1.  **Fetcher:** Downloads documentation sets (manifest, indices, content) from DevDocs.
+2.  **Indexer:** Stores metadata and search indices locally in XDG data directories.
+3.  **Search Engine:** Loads indices into memory and performs fuzzy matching on query.
+4.  **Renderer:** Transforms stored HTML content into readable terminal text or Markdown on demand.
 
-## Tech Stack
+The application follows a standard Go project layout with a clear separation between CLI interface (`cmd`, `internal/cli`) and core logic (`internal/devdocs`, `internal/search`, `internal/render`).
 
-- **Language**: Go 1.25.7
-- **CLI Framework**: Cobra (github.com/spf13/cobra)
-- **TUI Framework**: Bubble Tea (v1.3.10) with Bubbles components
-- **Database**: SQLite via modernc.org/sqlite
-- **Fuzzy Search**: github.com/sahilm/fuzzy
-- **Styling**: Lipgloss (github.com/charmbracelet/lipgloss)
+## 3. Critical Data Flows
 
-## Architecture
+### Installation Flow (`dsearch install <doc>`)
+1.  **Manifest Fetch:** `devdocs.Client` fetches `docs.json` from `devdocs.io`.
+2.  **Selection:** User input (e.g., "react@18") is parsed and matched against manifest.
+3.  **Download:**
+    *   Index (`index.json`): Contains all searchable entries.
+    *   Content (`db.json`): Contains compiled HTML blobs.
+4.  **Storage:** `devdocs.Store` unpacks `db.json` into individual HTML files in `~/.local/share/dsearch/docs/<image>/content/`.
 
-```
-dsearch/
-├── cmd/dsearch/         # Main application entry point
-├── internal/
-│   ├── cli/            # CLI commands (root, install, list, available, version)
-│   ├── config/         # Configuration and path management (XDG spec)
-│   ├── docset/         # Docset discovery, loading, and SQLite access
-│   ├── manager/        # Feed management for docsets
-│   ├── render/         # HTML to text/markdown conversion
-│   ├── search/         # Search engine with fuzzy matching
-│   └── tui/            # Interactive terminal user interface
-└── Makefile            # Build and development commands
-```
+### Search Flow (`dsearch <query>`)
+1.  **Initialization:** `loadSearchEngine` loads selected (or all) indices from disk.
+2.  **Execution:** `search.Engine` aggregates entries and performs fuzzy matching.
+3.  **Optimization:** If `--doc` is passed, only relevant indices are loaded/searched.
+4.  **Result:** Matches are ranked by score and returned.
 
-## Key Components
+### Render Flow (View Result)
+1.  **Load:** `devdocs.Store` reads the specific HTML file for the selected entry.
+2.  **Process:** `render.Renderer` uses `readability` to strip navigation/ads.
+3.  **Format:** Content is converted to requested format (Text/Markdown) and printed to stdout.
 
-### search.Engine
-- Core search functionality across multiple docsets
-- Fuzzy matching with scoring (0-1)
-- Supports filtering by docset name and entry type
-- Returns sorted results with metadata
+## 4. Key Directory Map
+- `cmd/dsearch`: Application entry point (`main.go`).
+- `internal/cli`: Cobra command definitions and flag handling.
+- `internal/config`: XDG path configuration and management.
+- `internal/devdocs`:
+    - `client.go`: HTTP client for DevDocs API.
+    - `store.go`: Local filesystem storage management.
+    - `types.go`: Core data models (Doc, Index, Entry).
+- `internal/render`: HTML-to-Text/Markdown conversion logic.
+- `internal/search`: In-memory fuzzy search engine implementation.
 
-### docset.Docset
-- Represents a Dash documentation set
-- Discovers .docset bundles from directory
-- Queries SQLite index (docSet.dsidx) for entries
-- Provides access to HTML content files
+## 5. Developer Guide / Conventions
+- **Error Handling:** Go 1.13+ style wrapping (`fmt.Errorf("...: %w", err)`).
+- **Configuration:** Strictly adheres to XDG Base Directory specification.
+- **Dependency Injection:** explicit constructors (`New...`) used for testability.
+- **Output:**
+    - `stdout`: Search results and content.
+    - `stderr`: Logs, warnings, and progress bars.
+    - JSON output supported via `--json` flag for integration.
 
-### tui.Model
-- Interactive TUI using Bubble Tea framework
-- Features:
-  - Search input with debouncing (300ms)
-  - Scrollable results list using bubbles/list
-  - Content preview panel (toggleable with Tab)
-  - Keyboard navigation (arrow keys, Enter, Ctrl+C)
-  - Handles window resize events
-
-### cli.Commands
-- `dsearch [query]` - Direct search or launch TUI
-- `dsearch list` - List installed docsets
-- `dsearch available` - List available docsets to install
-- `dsearch install <docset>` - Install a docset
-- `dsearch version` - Show version info
-
-## Design Patterns
-
-- **Hexagonal-ish**: Clean separation between domain logic (search, docset) and interfaces (CLI, TUI)
-- **Interface-based**: Accept interfaces, return structs (e.g., search.Engine works with docset.Docset)
-- **Error Wrapping**: Errors wrapped with context using `fmt.Errorf("...: %w", err)`
-- **Resource Management**: Database connections deferred close, file operations with proper error checking
-
-## Code Conventions
-
-- **Naming**: Exported names start with capital letter, short receivers (1-2 letters)
-- **Comments**: Godoc comments on all exported functions/types
-- **Error Handling**: Always check errors, never ignore them
-- **Formatting**: Standard Go formatting via `gofmt`
-- **Testing**: Use table-driven tests with `t.Parallel()`
-- **Imports**: Grouped as stdlib, blank line, third-party
-
-## Development Commands
-
-### Build & Run
-```bash
-make build        # Build binary to bin/dsearch
-make run          # Run without building
-make dev          # Build and run with ARGS variable
-```
-
-### Testing
-```bash
-make test         # Run all tests
-make test-cover   # Run tests with coverage
-```
-
-### Code Quality
-```bash
-make fmt          # Format code
-make lint         # Run golangci-lint
-```
-
-### Deployment
-```bash
-make install      # Install to GOPATH/bin
-make release      # Build for multiple platforms
-```
-
-## XDG Directories
-
-- Data: `~/.local/share/dsearch/` (docsets storage)
-- Config: `~/.config/dsearch/` (configuration files)
-- Cache: `~/.cache/dsearch/` (downloaded feeds)
-
-## Key Features
-
-1. **Offline Search**: No network required after docset installation
-2. **Fuzzy Matching**: Intelligent ranking of results
-3. **Multiple Formats**: Output as text or markdown
-4. **Interactive TUI**: Browse and search interactively
-5. **Cross-Platform**: Builds for Darwin, Linux (amd64/arm64)
-
-## Entry Points
-
-- **Main**: `cmd/dsearch/main.go` → `cli.Execute()`
-- **CLI**: `internal/cli/root.go` → Cobra command tree
-- **TUI**: `internal/tui/model.go` → Bubble Tea program
+## 6. Known Technical Debt / Watchlist
+- **Memory Usage:** `search.Engine` loads indices into memory. With many large docsets installed, this could bloat memory usage.
+- **Rendering Fragility:** `render.go` uses `readability` with a dummy base URL (`http://localhost/docset`). Complex relative links or assets might break.
+- **HTML Parsing:** `extractText` in `render.go` manually traverses HTML nodes, which can be brittle compared to using a robust policy-based sanitizer/extractor.
+- **Lack of Concurrency:** Installation downloads `db.json` and extracts sequentially. Large docs could benefit from concurrent processing (though `db.json` is a single file).
