@@ -19,13 +19,16 @@ type Meta struct {
 
 // Store handles downloading and storing DevDocs documentation
 type Store struct {
-	rootDir string
+	dataDir  string
+	cacheDir string
 }
 
-// NewStore creates a new Store rooted at the given directory
-func NewStore(rootDir string) *Store {
+// NewStore creates a new Store with the given root directory.
+// cacheDir is the directory for caching the manifest (e.g., ~/.cache/dsearch)
+func NewStore(rootDir, cacheDir string) *Store {
 	return &Store{
-		rootDir: rootDir,
+		dataDir:  rootDir,
+		cacheDir: cacheDir,
 	}
 }
 
@@ -45,7 +48,7 @@ func (s *Store) Install(slug string, index *Index, db map[string]string, manifes
 	}
 
 	// Create doc directory
-	docDir := filepath.Join(s.rootDir, "docs", slug)
+	docDir := filepath.Join(s.dataDir, "docs", slug)
 	if err := os.MkdirAll(docDir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create doc directory: %w", err)
 	}
@@ -94,7 +97,7 @@ func (s *Store) Install(slug string, index *Index, db map[string]string, manifes
 
 // LoadIndex loads the search index for an installed doc
 func (s *Store) LoadIndex(slug string) (*Index, error) {
-	indexPath := filepath.Join(s.rootDir, "docs", slug, "index.json")
+	indexPath := filepath.Join(s.dataDir, "docs", slug, "index.json")
 	data, err := os.ReadFile(indexPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read index: %w", err)
@@ -110,7 +113,7 @@ func (s *Store) LoadIndex(slug string) (*Index, error) {
 
 // LoadContent loads HTML content for a specific path in an installed doc
 func (s *Store) LoadContent(slug, path string) (string, error) {
-	contentPath := filepath.Join(s.rootDir, "docs", slug, "content", path+".html")
+	contentPath := filepath.Join(s.dataDir, "docs", slug, "content", path+".html")
 	data, err := os.ReadFile(contentPath)
 	if err != nil {
 		return "", fmt.Errorf("failed to read content: %w", err)
@@ -121,7 +124,7 @@ func (s *Store) LoadContent(slug, path string) (string, error) {
 
 // IsInstalled checks if a doc is installed
 func (s *Store) IsInstalled(slug string) bool {
-	docDir := filepath.Join(s.rootDir, "docs", slug)
+	docDir := filepath.Join(s.dataDir, "docs", slug)
 	info, err := os.Stat(docDir)
 	if err != nil {
 		return false
@@ -131,7 +134,7 @@ func (s *Store) IsInstalled(slug string) bool {
 
 // ListInstalled returns a list of all installed doc slugs
 func (s *Store) ListInstalled() []string {
-	docsDir := filepath.Join(s.rootDir, "docs")
+	docsDir := filepath.Join(s.dataDir, "docs")
 	entries, err := os.ReadDir(docsDir)
 	if err != nil {
 		return nil
@@ -149,18 +152,17 @@ func (s *Store) ListInstalled() []string {
 
 // SaveManifest saves the DevDocs manifest to cache
 func (s *Store) SaveManifest(manifest []Doc) error {
-	cacheDir := filepath.Join(s.rootDir, "cache")
-	if err := os.MkdirAll(cacheDir, 0755); err != nil {
+	if err := os.MkdirAll(s.cacheDir, 0755); err != nil {
 		return fmt.Errorf("failed to create cache directory: %w", err)
 	}
 
-	manifestPath := filepath.Join(cacheDir, "manifest.json")
+	manifestPath := filepath.Join(s.cacheDir, "manifest.json")
 	return writeJSON(manifestPath, manifest)
 }
 
 // LoadManifest loads the cached DevDocs manifest
 func (s *Store) LoadManifest() ([]Doc, error) {
-	manifestPath := filepath.Join(s.rootDir, "cache", "manifest.json")
+	manifestPath := filepath.Join(s.cacheDir, "manifest.json")
 	data, err := os.ReadFile(manifestPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read manifest: %w", err)
@@ -176,7 +178,7 @@ func (s *Store) LoadManifest() ([]Doc, error) {
 
 // Uninstall removes an installed doc
 func (s *Store) Uninstall(slug string) error {
-	docDir := filepath.Join(s.rootDir, "docs", slug)
+	docDir := filepath.Join(s.dataDir, "docs", slug)
 	return os.RemoveAll(docDir)
 }
 

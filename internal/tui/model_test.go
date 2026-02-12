@@ -18,7 +18,7 @@ func TestNewModel(t *testing.T) {
 		{Entries: []devdocs.Entry{{Name: "test", Type: "Function", Path: "test.html"}}},
 	}
 	indicesBySlug := map[string]*devdocs.Index{"test": indices[0]}
-	store := devdocs.NewStore(t.TempDir())
+	store := devdocs.NewStore(t.TempDir(), t.TempDir())
 
 	engine := search.New(indices, indicesBySlug, 10)
 
@@ -47,7 +47,7 @@ func TestSetOutputFormat(t *testing.T) {
 		{Entries: []devdocs.Entry{{Name: "test"}}},
 	}
 	indicesBySlug := map[string]*devdocs.Index{"test": indices[0]}
-	store := devdocs.NewStore(t.TempDir())
+	store := devdocs.NewStore(t.TempDir(), t.TempDir())
 
 	model := NewModel(search.New(indices, indicesBySlug, 10), store)
 
@@ -69,7 +69,7 @@ func TestViewportScrolling(t *testing.T) {
 		{Entries: []devdocs.Entry{{Name: "test"}}},
 	}
 	indicesBySlug := map[string]*devdocs.Index{"test": indices[0]}
-	store := devdocs.NewStore(t.TempDir())
+	store := devdocs.NewStore(t.TempDir(), t.TempDir())
 
 	model := NewModel(search.New(indices, indicesBySlug, 10), store)
 	model.previewText = strings.Repeat("Line\n", 50) // 50 lines
@@ -102,7 +102,7 @@ func TestLoadContentCmd(t *testing.T) {
 		{Entries: []devdocs.Entry{{Name: "test"}}},
 	}
 	indicesBySlug := map[string]*devdocs.Index{"test": indices[0]}
-	store := devdocs.NewStore(t.TempDir())
+	store := devdocs.NewStore(t.TempDir(), t.TempDir())
 
 	engine := search.New(indices, indicesBySlug, 10)
 	model := NewModel(engine, store)

@@ -10,20 +10,35 @@ import (
 )
 
 const (
-	defaultTimeout = 30 * time.Second
-	userAgent      = "github.com/icampana/dsearch"
+	defaultTimeout     = 60 * time.Second
+	userAgent          = "github.com/icampana/dsearch"
+	defaultManifestURL = "https://devdocs.io"
+	defaultContentURL  = "https://documents.devdocs.io"
 )
 
 // Client is an HTTP client for fetching DevDocs data
 type Client struct {
-	baseURL    string
-	httpClient *http.Client
+	manifestURL string
+	contentURL  string
+	httpClient  *http.Client
 }
 
-// NewClient creates a new DevDocs API client
+// NewClient creates a new DevDocs API client.
+// If baseURL is non-empty, it overrides both manifest and content URLs (for testing).
+// Otherwise, uses the default DevDocs URLs.
 func NewClient(baseURL string) *Client {
+	if baseURL != "" {
+		return &Client{
+			manifestURL: baseURL,
+			contentURL:  baseURL,
+			httpClient: &http.Client{
+				Timeout: defaultTimeout,
+			},
+		}
+	}
 	return &Client{
-		baseURL: baseURL,
+		manifestURL: defaultManifestURL,
+		contentURL:  defaultContentURL,
 		httpClient: &http.Client{
 			Timeout: defaultTimeout,
 		},
@@ -33,7 +48,7 @@ func NewClient(baseURL string) *Client {
 // FetchManifest fetches the docs.json manifest from DevDocs
 // Returns a list of all available documentation
 func (c *Client) FetchManifest() ([]Doc, error) {
-	url := fmt.Sprintf("%s/docs.json", c.baseURL)
+	url := fmt.Sprintf("%s/docs.json", c.manifestURL)
 
 	resp, err := c.httpClient.Get(url)
 	if err != nil {
@@ -61,7 +76,7 @@ func (c *Client) FetchManifest() ([]Doc, error) {
 // FetchIndex fetches the index.json for a specific documentation slug
 // Returns the search index containing entries and types
 func (c *Client) FetchIndex(slug string) (*Index, error) {
-	url := fmt.Sprintf("%s/%s/index.json", c.baseURL, slug)
+	url := fmt.Sprintf("%s/%s/index.json", c.contentURL, slug)
 
 	resp, err := c.httpClient.Get(url)
 	if err != nil {
@@ -89,7 +104,7 @@ func (c *Client) FetchIndex(slug string) (*Index, error) {
 // FetchDB fetches the db.json for a specific documentation slug
 // Returns a map of content paths to HTML strings
 func (c *Client) FetchDB(slug string) (map[string]string, error) {
-	url := fmt.Sprintf("%s/%s/db.json", c.baseURL, slug)
+	url := fmt.Sprintf("%s/%s/db.json", c.contentURL, slug)
 
 	resp, err := c.httpClient.Get(url)
 	if err != nil {

@@ -22,7 +22,7 @@ var listCmd = &cobra.Command{
 
 func runList(cmd *cobra.Command, args []string) error {
 	cfg := config.DefaultPaths()
-	store := devdocs.NewStore(cfg.DataDir)
+	store := devdocs.NewStore(cfg.DataDir, cfg.CacheDir)
 
 	installedSlugs := store.ListInstalled()
 

@@ -27,7 +27,7 @@ func TestInstallNewDoc(t *testing.T) {
 		{Name: "Test", Slug: "test", Mtime: 12345, DBSize: 100},
 	}
 
-	store := NewStore(tmpDir)
+	store := NewStore(tmpDir, tmpDir)
 
 	// Install
 	meta, err := store.Install("test", mockIndex, mockDB, mockManifest)
@@ -81,7 +81,7 @@ func TestLoadIndex(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	store := NewStore(tmpDir)
+	store := NewStore(tmpDir, tmpDir)
 
 	// Load index
 	index, err := store.LoadIndex("test")
@@ -113,7 +113,7 @@ func TestLoadContent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	store := NewStore(tmpDir)
+	store := NewStore(tmpDir, tmpDir)
 
 	// Load content
 	content, err := store.LoadContent("test", "test/path")
@@ -135,7 +135,7 @@ func TestIsInstalled(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	store := NewStore(tmpDir)
+	store := NewStore(tmpDir, tmpDir)
 
 	// Test installed
 	if !store.IsInstalled("test") {
@@ -159,7 +159,7 @@ func TestListInstalled(t *testing.T) {
 		}
 	}
 
-	store := NewStore(tmpDir)
+	store := NewStore(tmpDir, tmpDir)
 
 	// List
 	installed := store.ListInstalled()
@@ -175,7 +175,7 @@ func TestSaveAndLoadManifest(t *testing.T) {
 		{Name: "Test", Slug: "test", Mtime: 12345},
 	}
 
-	store := NewStore(tmpDir)
+	store := NewStore(tmpDir, tmpDir)
 
 	// Save
 	err := store.SaveManifest(mockManifest)
@@ -184,7 +184,8 @@ func TestSaveAndLoadManifest(t *testing.T) {
 	}
 
 	// Verify file exists
-	cacheDir := filepath.Join(tmpDir, "cache")
+	// Since cacheDir = tmpDir in this test, check directly at tmpDir
+	cacheDir := tmpDir
 	if _, err := os.Stat(cacheDir); os.IsNotExist(err) {
 		t.Errorf("Cache directory not created at %s", cacheDir)
 	}
@@ -206,7 +207,8 @@ func TestSaveAndLoadManifest(t *testing.T) {
 func TestLoadManifest_NotExists(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	store := NewStore(tmpDir)
+	// Use same directory for both data and cache in tests
+	store := NewStore(tmpDir, tmpDir)
 
 	_, err := store.LoadManifest()
 	if err == nil {
@@ -223,7 +225,7 @@ func TestUninstall(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	store := NewStore(tmpDir)
+	store := NewStore(tmpDir, tmpDir)
 
 	// Uninstall
 	err := store.Uninstall("test")

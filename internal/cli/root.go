@@ -55,7 +55,7 @@ Examples:
 		}
 
 		// Load all installed indices
-		store = devdocs.NewStore(paths.DataDir)
+		store = devdocs.NewStore(paths.DataDir, paths.CacheDir)
 		installedSlugs := store.ListInstalled()
 
 		allIndices = make([]*devdocs.Index, 0, len(installedSlugs))

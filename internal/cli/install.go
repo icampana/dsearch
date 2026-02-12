@@ -38,8 +38,9 @@ func runInstall(cmd *cobra.Command, args []string) error {
 	}
 
 	// Create DevDocs client and store
-	client := devdocs.NewClient("https://documents.devdocs.io")
-	store := devdocs.NewStore(cfg.DataDir)
+	// Empty string uses default DevDocs URLs (devdocs.io for manifest, documents.devdocs.io for content)
+	client := devdocs.NewClient("")
+	store := devdocs.NewStore(cfg.DataDir, cfg.CacheDir)
 
 	// Fetch manifest (or use cached)
 	manifest, err := store.LoadManifest()

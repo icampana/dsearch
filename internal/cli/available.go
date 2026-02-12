@@ -26,7 +26,7 @@ func runAvailable(cmd *cobra.Command, args []string) error {
 	}
 
 	// Try to load cached manifest first
-	store := devdocs.NewStore(cfg.DataDir)
+	store := devdocs.NewStore(cfg.DataDir, cfg.CacheDir)
 	manifest, err := store.LoadManifest()
 
 	// If not cached or stale, fetch from DevDocs
