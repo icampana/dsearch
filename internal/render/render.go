@@ -4,13 +4,11 @@ package render
 import (
 	"bytes"
 	"fmt"
-	"io"
 	"log"
 	"net/url"
 	"strings"
 
 	htmltomarkdown "github.com/JohannesKaufmann/html-to-markdown/v2"
-	"github.com/JohannesKaufmann/html-to-markdown/v2/converter"
 	"golang.org/x/net/html"
 
 	readability "codeberg.org/readeck/go-readability"
@@ -155,46 +153,4 @@ func (r *Renderer) extractText(n *html.Node, buf *strings.Builder) {
 			r.extractText(c, buf)
 		}
 	}
-}
-
-// CleanContent is a no-op - cleaning now happens during Render.
-// Kept for backwards compatibility.
-func CleanContent(htmlContent []byte) []byte {
-	return htmlContent
-}
-
-// FromReaderWithMarkdown converts HTML from an io.Reader to markdown.
-// This is a convenience function that extracts main content and converts to markdown.
-func FromReaderWithMarkdown(r io.Reader) (string, error) {
-	htmlContent, err := io.ReadAll(r)
-	if err != nil {
-		return "", fmt.Errorf("reading HTML: %w", err)
-	}
-
-	renderer := New(FormatMD)
-	return renderer.Render(htmlContent)
-}
-
-// FromReaderWithMarkdownAndDomain converts HTML from an io.Reader to markdown,
-// using the specified domain to resolve relative links.
-func FromReaderWithMarkdownAndDomain(r io.Reader, domain string) (string, error) {
-	htmlContent, err := io.ReadAll(r)
-	if err != nil {
-		return "", fmt.Errorf("reading HTML: %w", err)
-	}
-
-	// Extract main content
-	baseURL, _ := url.Parse(domain)
-	article, err := readability.FromReader(bytes.NewReader(htmlContent), baseURL)
-	if err != nil {
-		return "", fmt.Errorf("readability extraction: %w", err)
-	}
-
-	// Convert to markdown with domain option
-	md, err := htmltomarkdown.ConvertString(article.Content, converter.WithDomain(domain))
-	if err != nil {
-		return "", fmt.Errorf("converting to markdown: %w", err)
-	}
-
-	return strings.TrimSpace(md), nil
 }

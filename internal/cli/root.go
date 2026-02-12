@@ -75,6 +75,11 @@ func initConfig() {
 	if err := paths.EnsureDirs(); err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: could not create directories: %v\n", err)
 	}
+
+	// One-time migration from old double-nested path
+	if err := config.MigrateDataDir(paths.DataDir); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: migration failed: %v\n", err)
+	}
 }
 
 func loadSearchEngine() (*search.Engine, *devdocs.Store, error) {

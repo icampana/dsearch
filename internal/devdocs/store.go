@@ -183,7 +183,7 @@ func (s *Store) Uninstall(slug string) error {
 }
 
 // writeJSON is a helper to write JSON to a file
-func writeJSON(path string, v interface{}) error {
+func writeJSON(path string, v any) error {
 	data, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {
 		return err

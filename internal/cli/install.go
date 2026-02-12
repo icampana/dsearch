@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/schollz/progressbar/v3"
 	"github.com/spf13/cobra"
 
 	"github.com/icampana/dsearch/internal/config"
@@ -94,14 +93,12 @@ func runInstall(cmd *cobra.Command, args []string) error {
 			continue
 		}
 
-		// Install with progress bar
-		bar := progressbar.Default(int64(len(db)), "Extracting content")
+		// Install
 		_, err = store.Install(slug, index, db, manifest)
 		if err != nil {
 			fmt.Printf("Error installing %s: %v\n", input, err)
 			continue
 		}
-		bar.Finish()
 
 		fmt.Printf("Successfully installed %s (%d entries)\n", doc.Name, len(index.Entries))
 	}

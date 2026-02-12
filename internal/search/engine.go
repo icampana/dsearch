@@ -14,14 +14,22 @@ import (
 type Engine struct {
 	indices       []*devdocs.Index
 	indicesBySlug map[string]*devdocs.Index // slug -> Index lookup
+	slugsByIndex  map[*devdocs.Index]string // Index -> slug lookup (for reverse mapping)
 	limit         int
 }
 
 // New creates a new search engine.
 func New(indices []*devdocs.Index, indicesBySlug map[string]*devdocs.Index, limit int) *Engine {
+	// Build reverse map for O(1) index-to-slug lookup
+	slugsByIndex := make(map[*devdocs.Index]string, len(indicesBySlug))
+	for slug, idx := range indicesBySlug {
+		slugsByIndex[idx] = slug
+	}
+
 	return &Engine{
 		indices:       indices,
 		indicesBySlug: indicesBySlug,
+		slugsByIndex:  slugsByIndex,
 		limit:         limit,
 	}
 }
@@ -67,14 +75,8 @@ func (e *Engine) Search(query string, docSlugs []string) ([]Result, string, erro
 	}
 	var allEntries []indexedEntry
 	for _, idx := range indicesToSearch {
-		// Find which slug this index belongs to
-		slug := ""
-		for s, i := range e.indicesBySlug {
-			if i == idx {
-				slug = s
-				break
-			}
-		}
+		// Direct O(1) lookup using reverse map
+		slug := e.slugsByIndex[idx]
 		for _, entry := range idx.Entries {
 			allEntries = append(allEntries, indexedEntry{entry: entry, slug: slug})
 		}

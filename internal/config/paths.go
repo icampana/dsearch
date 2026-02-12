@@ -37,7 +37,7 @@ func DefaultPaths() Paths {
 	}
 
 	return Paths{
-		DataDir:   filepath.Join(dataDir, "dsearch", "docs"),
+		DataDir:   filepath.Join(dataDir, "dsearch"),
 		CacheDir:  filepath.Join(cacheDir, "dsearch"),
 		ConfigDir: filepath.Join(configDir, "dsearch"),
 	}
