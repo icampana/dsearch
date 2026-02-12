@@ -23,26 +23,53 @@ type Client struct {
 	httpClient  *http.Client
 }
 
-// NewClient creates a new DevDocs API client.
-// If baseURL is non-empty, it overrides both manifest and content URLs (for testing).
-// Otherwise, uses the default DevDocs URLs.
-func NewClient(baseURL string) *Client {
-	if baseURL != "" {
-		return &Client{
-			manifestURL: baseURL,
-			contentURL:  baseURL,
-			httpClient: &http.Client{
-				Timeout: defaultTimeout,
-			},
-		}
+// ClientOption allows configuring the client
+type ClientOption func(*Client)
+
+// WithBaseURL sets a custom base URL for both manifest and content
+func WithBaseURL(url string) ClientOption {
+	return func(c *Client) {
+		c.manifestURL = url
+		c.contentURL = url
 	}
-	return &Client{
+}
+
+// WithManifestURL sets a custom manifest URL
+func WithManifestURL(url string) ClientOption {
+	return func(c *Client) {
+		c.manifestURL = url
+	}
+}
+
+// WithContentURL sets a custom content URL
+func WithContentURL(url string) ClientOption {
+	return func(c *Client) {
+		c.contentURL = url
+	}
+}
+
+// WithTimeout sets a custom timeout
+func WithTimeout(timeout time.Duration) ClientOption {
+	return func(c *Client) {
+		c.httpClient.Timeout = timeout
+	}
+}
+
+// NewClient creates a new DevDocs API client.
+func NewClient(opts ...ClientOption) *Client {
+	c := &Client{
 		manifestURL: defaultManifestURL,
 		contentURL:  defaultContentURL,
 		httpClient: &http.Client{
 			Timeout: defaultTimeout,
 		},
 	}
+
+	for _, opt := range opts {
+		opt(c)
+	}
+
+	return c
 }
 
 // FetchManifest fetches the docs.json manifest from DevDocs

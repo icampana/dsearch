@@ -31,7 +31,7 @@ func runAvailable(cmd *cobra.Command, args []string) error {
 
 	// If not cached or stale, fetch from DevDocs
 	if err != nil {
-		client := devdocs.NewClient("")
+		client := devdocs.NewClient()
 		manifest, err = client.FetchManifest()
 		if err != nil {
 			return fmt.Errorf("fetching available docs: %w", err)

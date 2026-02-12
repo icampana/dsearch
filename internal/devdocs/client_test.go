@@ -41,7 +41,7 @@ func TestFetchManifest(t *testing.T) {
 	defer ts.Close()
 
 	// Test client
-	client := NewClient(ts.URL)
+	client := NewClient(WithBaseURL(ts.URL))
 	docs, err := client.FetchManifest()
 	if err != nil {
 		t.Fatalf("FetchManifest() error = %v", err)
@@ -78,7 +78,7 @@ func TestFetchIndex(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	client := NewClient(ts.URL)
+	client := NewClient(WithBaseURL(ts.URL))
 	index, err := client.FetchIndex("react")
 	if err != nil {
 		t.Fatalf("FetchIndex() error = %v", err)
@@ -109,7 +109,7 @@ func TestFetchDB(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	client := NewClient(ts.URL)
+	client := NewClient(WithBaseURL(ts.URL))
 	db, err := client.FetchDB("react")
 	if err != nil {
 		t.Fatalf("FetchDB() error = %v", err)
@@ -134,7 +134,7 @@ func TestFetchManifestHTTPError(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	client := NewClient(ts.URL)
+	client := NewClient(WithBaseURL(ts.URL))
 	_, err := client.FetchManifest()
 	if err == nil {
 		t.Error("Expected error for 500 response, got nil")
@@ -148,7 +148,7 @@ func TestFetchIndexInvalidJSON(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	client := NewClient(ts.URL)
+	client := NewClient(WithBaseURL(ts.URL))
 	_, err := client.FetchIndex("react")
 	if err == nil {
 		t.Error("Expected error for invalid JSON, got nil")

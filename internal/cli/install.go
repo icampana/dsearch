@@ -39,7 +39,7 @@ func runInstall(cmd *cobra.Command, args []string) error {
 
 	// Create DevDocs client and store
 	// Empty string uses default DevDocs URLs (devdocs.io for manifest, documents.devdocs.io for content)
-	client := devdocs.NewClient("")
+	client := devdocs.NewClient()
 	store := devdocs.NewStore(cfg.DataDir, cfg.CacheDir)
 
 	// Fetch manifest (or use cached)
@@ -81,18 +81,22 @@ func runInstall(cmd *cobra.Command, args []string) error {
 		}
 
 		// Fetch index
+		fmt.Printf("DEBUG: Fetching index for %s\n", slug)
 		index, err := client.FetchIndex(slug)
 		if err != nil {
 			fmt.Printf("Error fetching index for %s: %v\n", input, err)
 			continue
 		}
+		fmt.Printf("DEBUG: Got %d entries in index\n", len(index.Entries))
 
 		// Fetch db
+		fmt.Printf("DEBUG: Fetching db for %s\n", slug)
 		db, err := client.FetchDB(slug)
 		if err != nil {
 			fmt.Printf("Error fetching db for %s: %v\n", input, err)
 			continue
 		}
+		fmt.Printf("DEBUG: Got %d entries in db\n", len(db))
 
 		// Install with progress bar
 		bar := progressbar.Default(int64(len(db)), "Extracting content")
