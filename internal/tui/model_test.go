@@ -7,27 +7,30 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/icampana/dsearch/internal/docset"
+	"github.com/icampana/dsearch/internal/devdocs"
 	"github.com/icampana/dsearch/internal/render"
 	"github.com/icampana/dsearch/internal/search"
 )
 
 func TestNewModel(t *testing.T) {
-	docsets := []docset.Docset{
-		{Name: "Test Docset", Path: "/test", IndexPath: "/test.idx", DocsPath: "/test/docs"},
+	// Create mock indices and store
+	indices := []*devdocs.Index{
+		{Entries: []devdocs.Entry{{Name: "test", Type: "Function", Path: "test.html"}}},
 	}
+	indicesBySlug := map[string]*devdocs.Index{"test": indices[0]}
+	store := devdocs.NewStore(t.TempDir())
 
-	engine := search.New(docsets, "", 10)
+	engine := search.New(indices, indicesBySlug, 10)
 
-	model := NewModel(engine, docsets)
+	model := NewModel(engine, store)
 
 	// Verify initial state
 	if model.engine != engine {
 		t.Error("Engine not set correctly")
 	}
 
-	if len(model.docsets) != len(docsets) {
-		t.Error("Docsets not set correctly")
+	if model.store != store {
+		t.Error("Store not set correctly")
 	}
 
 	if model.showPreview != true {
@@ -40,11 +43,13 @@ func TestNewModel(t *testing.T) {
 }
 
 func TestSetOutputFormat(t *testing.T) {
-	docsets := []docset.Docset{
-		{Name: "Test", Path: "/test", IndexPath: "/test.idx", DocsPath: "/test/docs"},
+	indices := []*devdocs.Index{
+		{Entries: []devdocs.Entry{{Name: "test"}}},
 	}
+	indicesBySlug := map[string]*devdocs.Index{"test": indices[0]}
+	store := devdocs.NewStore(t.TempDir())
 
-	model := NewModel(search.New(docsets, "", 10), docsets)
+	model := NewModel(search.New(indices, indicesBySlug, 10), store)
 
 	// Test setting to markdown
 	model.SetOutputFormat(render.FormatMD)
@@ -60,11 +65,13 @@ func TestSetOutputFormat(t *testing.T) {
 }
 
 func TestViewportScrolling(t *testing.T) {
-	docsets := []docset.Docset{
-		{Name: "Test", Path: "/test", IndexPath: "/test.idx", DocsPath: "/test/docs"},
+	indices := []*devdocs.Index{
+		{Entries: []devdocs.Entry{{Name: "test"}}},
 	}
+	indicesBySlug := map[string]*devdocs.Index{"test": indices[0]}
+	store := devdocs.NewStore(t.TempDir())
 
-	model := NewModel(search.New(docsets, "", 10), docsets)
+	model := NewModel(search.New(indices, indicesBySlug, 10), store)
 	model.previewText = strings.Repeat("Line\n", 50) // 50 lines
 	model.showPreview = true
 
@@ -91,21 +98,23 @@ func TestViewportScrolling(t *testing.T) {
 }
 
 func TestLoadContentCmd(t *testing.T) {
-	docsets := []docset.Docset{
-		{Name: "Test", Path: "/test", IndexPath: "/test.idx", DocsPath: "/test/docs"},
+	indices := []*devdocs.Index{
+		{Entries: []devdocs.Entry{{Name: "test"}}},
 	}
+	indicesBySlug := map[string]*devdocs.Index{"test": indices[0]}
+	store := devdocs.NewStore(t.TempDir())
 
-	engine := search.New(docsets, "", 10)
-	model := NewModel(engine, docsets)
+	engine := search.New(indices, indicesBySlug, 10)
+	model := NewModel(engine, store)
 
 	// Create a mock result
 	result := search.Result{
-		Entry: docset.Entry{
-			Name:     "test",
-			Type:     "Function",
-			Path:     "test.html",
-			FullPath: "/test/docs/test.html",
+		Entry: devdocs.Entry{
+			Name: "test",
+			Type: "Function",
+			Path: "test.html",
 		},
+		Slug:  "test",
 		Score: 0.8,
 	}
 

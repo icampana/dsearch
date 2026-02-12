@@ -13,7 +13,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/icampana/dsearch/internal/docset"
+	"github.com/icampana/dsearch/internal/devdocs"
 	"github.com/icampana/dsearch/internal/render"
 	"github.com/icampana/dsearch/internal/search"
 )
@@ -42,7 +42,7 @@ func (i resultItem) Title() string {
 
 // Description returns the description for the list item.
 func (i resultItem) Description() string {
-	return fmt.Sprintf("%s [%s]", i.result.Docset, i.result.Type)
+	return fmt.Sprintf("%s [%s]", i.result.Slug, i.result.Type)
 }
 
 // FilterValue returns the value to filter by.
@@ -64,7 +64,7 @@ type contentLoadedMsg struct {
 // Model represents the TUI application state.
 type Model struct {
 	engine       *search.Engine
-	docsets      []docset.Docset
+	store        *devdocs.Store
 	input        textinput.Model
 	list         list.Model
 	viewport     viewport.Model
@@ -80,7 +80,7 @@ type Model struct {
 }
 
 // NewModel creates a new TUI model.
-func NewModel(engine *search.Engine, docsets []docset.Docset) Model {
+func NewModel(engine *search.Engine, store *devdocs.Store) Model {
 	ti := textinput.New()
 	ti.Placeholder = "Search..."
 	ti.PlaceholderStyle = placeholderStyle
@@ -112,7 +112,7 @@ func NewModel(engine *search.Engine, docsets []docset.Docset) Model {
 
 	return Model{
 		engine:       engine,
-		docsets:      docsets,
+		store:        store,
 		input:        ti,
 		list:         l,
 		viewport:     vp,
@@ -364,7 +364,7 @@ func (m Model) View() string {
 func (m Model) performSearchCmd(query string) tea.Cmd {
 	return func() tea.Msg {
 		time.Sleep(300 * time.Millisecond)
-		results, err := m.engine.Search(query, nil)
+		results, _, err := m.engine.Search(query, nil)
 		if err != nil {
 			return err
 		}
@@ -375,25 +375,13 @@ func (m Model) performSearchCmd(query string) tea.Cmd {
 // loadContentCmd loads and renders the documentation content for a result.
 func (m Model) loadContentCmd(result search.Result) tea.Cmd {
 	return func() tea.Msg {
-		var ds *docset.Docset
-		for i := range m.docsets {
-			if m.docsets[i].Name == result.Docset {
-				ds = &m.docsets[i]
-				break
-			}
-		}
-
-		if ds == nil {
-			return fmt.Errorf("docset not found: %s", result.Docset)
-		}
-
-		content, err := ds.GetContent(result.Entry)
+		content, err := m.store.LoadContent(result.Slug, result.Path)
 		if err != nil {
 			return fmt.Errorf("reading content: %w", err)
 		}
 
 		renderer := render.New(m.outputFormat)
-		rendered, err := renderer.Render(content)
+		rendered, err := renderer.Render([]byte(content))
 		if err != nil {
 			return fmt.Errorf("rendering content: %w", err)
 		}

@@ -101,7 +101,6 @@ func init() {
 	rootCmd.AddCommand(availableCmd)
 	rootCmd.AddCommand(installCmd)
 	rootCmd.AddCommand(versionCmd)
-	rootCmd.AddCommand(createCmd)
 }
 
 func initConfig() {
