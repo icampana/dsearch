@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -55,6 +56,9 @@ func runInstall(cmd *cobra.Command, args []string) error {
 	}
 
 	// Install each doc
+	var installErrors []string
+	successCount := 0
+
 	for _, input := range args {
 		slug := parseDocSlug(input)
 
@@ -67,7 +71,7 @@ func runInstall(cmd *cobra.Command, args []string) error {
 			}
 		}
 		if doc == nil {
-			fmt.Printf("Error: doc '%s' not found in DevDocs catalog\n", input)
+			installErrors = append(installErrors, fmt.Sprintf("doc '%s' not found in DevDocs catalog", input))
 			continue
 		}
 
@@ -82,26 +86,40 @@ func runInstall(cmd *cobra.Command, args []string) error {
 		// Fetch index
 		index, err := client.FetchIndex(slug)
 		if err != nil {
-			fmt.Printf("Error fetching index for %s: %v\n", input, err)
+			installErrors = append(installErrors, fmt.Sprintf("failed to fetch index for %s: %v", input, err))
 			continue
 		}
 
 		// Fetch db
 		db, err := client.FetchDB(slug)
 		if err != nil {
-			fmt.Printf("Error fetching db for %s: %v\n", input, err)
+			installErrors = append(installErrors, fmt.Sprintf("failed to fetch db for %s: %v", input, err))
 			continue
 		}
 
 		// Install
 		_, err = store.Install(slug, index, db, manifest)
 		if err != nil {
-			fmt.Printf("Error installing %s: %v\n", input, err)
+			installErrors = append(installErrors, fmt.Sprintf("failed to install %s: %v", input, err))
 			continue
 		}
 
 		fmt.Printf("Successfully installed %s (%d entries)\n", doc.Name, len(index.Entries))
+		successCount++
 	}
+
+	// Report results
+	if len(installErrors) > 0 {
+		fmt.Fprintf(os.Stderr, "\n%d installation(s) failed:\n", len(installErrors))
+		for _, errMsg := range installErrors {
+			fmt.Fprintf(os.Stderr, "  - %s\n", errMsg)
+		}
+		if successCount == 0 {
+			return fmt.Errorf("all installations failed")
+		}
+		return fmt.Errorf("%d installation(s) failed (see above)", len(installErrors))
+	}
+
 	return nil
 }
 

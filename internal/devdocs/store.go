@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -67,7 +68,7 @@ func (s *Store) Install(slug string, index *Index, db map[string]string, manifes
 
 	for path, content := range db {
 		// Ensure path is safe (no directory traversal)
-		if filepath.Clean(path) != path {
+		if filepath.IsAbs(path) || strings.Contains(path, "..") {
 			continue
 		}
 		contentFile := filepath.Join(contentDir, path+".html")

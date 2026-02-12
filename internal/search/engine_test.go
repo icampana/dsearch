@@ -66,7 +66,7 @@ func TestEngine_Search(t *testing.T) {
 			slugs:     []string{"django"},
 			wantCount: 0,
 			wantName:  "",
-			wantErr:   true, // Should return error if no results found
+			wantErr:   false, // Empty results are valid, not an error
 		},
 		{
 			name:      "No results",
@@ -74,7 +74,7 @@ func TestEngine_Search(t *testing.T) {
 			slugs:     nil,
 			wantCount: 0,
 			wantName:  "",
-			wantErr:   true,
+			wantErr:   false,
 		},
 	}
 

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/url"
+	"os"
 	"strings"
 
 	htmltomarkdown "github.com/JohannesKaufmann/html-to-markdown/v2"
@@ -71,7 +72,7 @@ func (r *Renderer) renderMarkdown(htmlContent []byte) (string, error) {
 	cleanContent, err := r.extractMainContent(htmlContent)
 	if err != nil {
 		// Fallback to original content if extraction fails
-		log.Printf("Warning: readability extraction failed: %v", err)
+		fmt.Fprintf(os.Stderr, "Warning: readability extraction failed: %v\n", err)
 		cleanContent = htmlContent
 	}
 

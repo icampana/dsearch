@@ -117,9 +117,5 @@ func (e *Engine) Search(query string, docSlugs []string) ([]Result, string, erro
 		results = results[:e.limit]
 	}
 
-	if len(results) == 0 {
-		return nil, warning, fmt.Errorf("no results found for %q", query)
-	}
-
 	return results, warning, nil
 }

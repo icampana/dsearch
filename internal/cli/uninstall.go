@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 
@@ -26,20 +27,36 @@ func runUninstall(cmd *cobra.Command, args []string) error {
 
 	store := devdocs.NewStore(cfg.DataDir, cfg.CacheDir)
 
+	var uninstallErrors []string
+	successCount := 0
+
 	for _, input := range args {
 		slug := parseDocSlug(input)
 
 		if !store.IsInstalled(slug) {
-			fmt.Printf("Doc '%s' is not installed\n", input)
+			uninstallErrors = append(uninstallErrors, fmt.Sprintf("doc '%s' is not installed", input))
 			continue
 		}
 
 		fmt.Printf("Uninstalling %s...\n", slug)
 		if err := store.Uninstall(slug); err != nil {
-			fmt.Printf("Error uninstalling %s: %v\n", input, err)
+			uninstallErrors = append(uninstallErrors, fmt.Sprintf("failed to uninstall %s: %v", input, err))
 			continue
 		}
 		fmt.Printf("Successfully uninstalled %s\n", slug)
+		successCount++
+	}
+
+	// Report results
+	if len(uninstallErrors) > 0 {
+		fmt.Fprintf(os.Stderr, "\n%d uninstallation(s) failed:\n", len(uninstallErrors))
+		for _, errMsg := range uninstallErrors {
+			fmt.Fprintf(os.Stderr, "  - %s\n", errMsg)
+		}
+		if successCount == 0 {
+			return fmt.Errorf("all uninstallations failed")
+		}
+		return fmt.Errorf("%d uninstallation(s) failed (see above)", len(uninstallErrors))
 	}
 
 	return nil
