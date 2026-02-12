@@ -1,167 +1,87 @@
 # dsearch
 
-A fast, offline documentation search tool for your terminal.
+**dsearch** is a fast, offline documentation search tool for your terminal. It brings the power of [DevDocs.io](https://devdocs.io) to your command line, allowing you to search and read documentation without leaving your terminal.
 
-[![Go](https://img.shields.io/badge/Go-00ADD8?style=flat&logo=go)](https://golang.org/)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-
-Search through [Dash](https://kapeli.com/dash)-compatible docsets with fuzzy matching, multiple output formats, and an interactive TUI.
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Go Version](https://img.shields.io/badge/go-1.25.7-blue.svg)
 
 ## Features
 
-- 🔍 **Fuzzy search** across all installed docsets
-- 📚 **200+ docsets** available (React, Node.js, Python, Go, Rust, etc.)
-- 📝 **Multiple output formats**: plain text or markdown (perfect for LLMs)
-- 🎨 **Interactive TUI** with live preview (coming soon)
-- ⚡ **Fast**: SQLite-based indexing with fuzzy matching
-- 🔌 **Offline**: Works completely offline once docsets are installed
+- ⚡ **Instant Fuzzy Search**: Find what you need quickly, even with typos.
+- 📚 **Offline Access**: Download once, search anywhere. No internet required after installation.
+- 🖥️ **Terminal-First Experience**: Read docs directly in your terminal with rich formatting.
+- 📝 **Markdown Output**: Pipe content to your favorite markdown viewer or editor (e.g., `glow`, `mdcat`, `vim`).
+- 🎯 **Scoped Search**: Search across all installed docs or filter to a specific framework (e.g., just `react`).
+- 🔧 **XDG Compliant**: Follows standard Linux/Unix directory structures for config and data.
 
 ## Installation
 
-### From source
+### From Source
+
+If you have Go installed (1.23+), you can install `dsearch` directly:
 
 ```bash
-git clone https://github.com/icampana/dsearch.git
-cd dsearch
-make install
+go install github.com/icampana/dsearch/cmd/dsearch@latest
 ```
 
-### Binary releases
+Ensure your `$GOPATH/bin` is in your `$PATH`.
 
-Coming soon! Download from [Releases](https://github.com/icampana/dsearch/releases).
+### Pre-built Binaries
 
-## Quick Start
-
-```bash
-# 1. List available docsets
-dsearch available
-
-# 2. Install docsets you want
-dsearch install React Node.js Go
-
-# 3. Search documentation
-dsearch useState
-
-# Or search in specific docset
-dsearch useState -d react
-
-# Get markdown output for LLMs
-dsearch useState --format md
-```
+> Coming soon! Automated releases for Linux, macOS, and Windows will be available on the [Releases](https://github.com/icampana/dsearch/releases) page.
 
 ## Usage
 
-### Interactive mode (coming soon)
+### 1. Install Documentation
+
+Before searching, you need to download documentation sets from DevDocs.
 
 ```bash
-dsearch                # Opens interactive fuzzy finder
-dsearch -d react       # Interactive mode filtered to React docset
+# Install specific docs
+dsearch install go react
+
+# Install with version/release
+dsearch install react@18
+dsearch install python~3.11
 ```
 
-### Direct search
+### 2. Search
 
 ```bash
-dsearch useState                     # Search all docsets
-dsearch useState -d react            # Search only React docset
-dsearch useState --format md         # Output as markdown
-dsearch useState --type Function     # Filter by entry type
-dsearch useState -l 20               # Limit to 20 results
-dsearch useState --list              # List results without content
+# Search across all installed docs
+dsearch useState
+
+# Search within a specific doc
+dsearch -d react useState
+
+# detailed output (full content)
+dsearch -d go http.Client --full
 ```
 
-### Docset management
+### 3. Output Formats
+
+By default, `dsearch` outputs simplified text with terminal formatting. You can also output Markdown or JSON.
 
 ```bash
-dsearch list                         # Show installed docsets
-dsearch available [query]             # Show downloadable docsets
-dsearch install react node bash       # Install docsets
+# Output as Markdown (great for piping to glow)
+dsearch -f md useState | glow -
+
+# Output results as JSON (for scripting)
+dsearch --json useState
 ```
 
 ## Configuration
 
-dsearch follows the [XDG Base Directory specification](https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html):
+`dsearch` follows the [XDG Base Directory Specification](https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html).
 
-- **Docsets**: `$XDG_DATA_HOME/dsearch/docsets/` (default: `~/.local/share/dsearch/docsets/`)
-- **Cache**: `$XDG_CACHE_HOME/dsearch/` (default: `~/.cache/dsearch/`)
-- **Config**: `$XDG_CONFIG_HOME/dsearch/config.yaml` (default: `~/.config/dsearch/config.yaml`)
-
-## Using with existing Dash/Zeal docsets
-
-If you already have docsets from Dash or Zeal, you can symlink them:
-
-```bash
-# macOS Dash
-ln -s ~/Library/Application\ Support/Dash/DocSets/* ~/.local/share/dsearch/docsets/
-
-# Zeal
-ln -s ~/.local/share/Zeal/Zeal/docsets/* ~/.local/share/dsearch/docsets/
-```
-
-## Development
-
-### Prerequisites
-
-- Go 1.21 or later
-
-### Build
-
-```bash
-# Build binary
-make build
-
-# Install to GOPATH/bin
-make install
-
-# Run without building
-make run
-
-# Run tests
-make test
-
-# Build for multiple platforms
-make release
-```
-
-## Status
-
-This project is under active development. See [STATUS.md](STATUS.md) for detailed progress.
-
-### Completed ✅
-
-- CLI framework with cobra
-- Docset discovery and parsing
-- SQLite index reading
-- Fuzzy search with scoring
-- Content rendering (text/markdown)
-- Docset installation from Kapeli feeds
-
-### In Progress 🚧
-
-- Interactive TUI with bubbletea
-
-### Planned 📋
-
-- Docset update/remove commands
-- Shell completions
-- Better HTML cleaning
-- Code syntax highlighting
-
-## Contributing
-
-Contributions welcome! Please read the contributing guidelines and submit pull requests.
+- **Data (Docs)**: `$XDG_DATA_HOME/dsearch` (default: `~/.local/share/dsearch`)
+- **Cache**: `$XDG_CACHE_HOME/dsearch` (default: `~/.cache/dsearch`)
+- **Config**: `$XDG_CONFIG_HOME/dsearch` (default: `~/.config/dsearch`)
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## Acknowledgments
+---
 
-- [Dash](https://kapeli.com/dash) for the docset format and feeds
-- [Kapeli](https://github.com/Kapeli) for maintaining the feeds repository
-- [dasht](https://github.com/sunaku/dasht) for original inspiration
-
-## Alternative Tools
-
-- [dasht](https://github.com/sunaku/dasht) - Shell-based docset searcher (unmaintained)
-- [Zeal](https://zealdocs.org/) - Qt-based docset browser
-- [DevDocs](https://devdocs.io/) - Web-based documentation browser
+*Not affiliated with DevDocs.io, but huge thanks to them for their amazing API and documentation aggregation.*

@@ -81,22 +81,18 @@ func runInstall(cmd *cobra.Command, args []string) error {
 		}
 
 		// Fetch index
-		fmt.Printf("DEBUG: Fetching index for %s\n", slug)
 		index, err := client.FetchIndex(slug)
 		if err != nil {
 			fmt.Printf("Error fetching index for %s: %v\n", input, err)
 			continue
 		}
-		fmt.Printf("DEBUG: Got %d entries in index\n", len(index.Entries))
 
 		// Fetch db
-		fmt.Printf("DEBUG: Fetching db for %s\n", slug)
 		db, err := client.FetchDB(slug)
 		if err != nil {
 			fmt.Printf("Error fetching db for %s: %v\n", input, err)
 			continue
 		}
-		fmt.Printf("DEBUG: Got %d entries in db\n", len(db))
 
 		// Install with progress bar
 		bar := progressbar.Default(int64(len(db)), "Extracting content")
